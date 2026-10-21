@@ -1,86 +1,119 @@
+```javascript
 const URL = "https://hqtqbprrvaymchhaucfx.supabase.co";
-
 const KEY = "sb_publishable_CGVN66a-EdSQH6AQ_saMTg_VsDBBTJn";
-
 
 // SALVAR PRODUTO
 async function salvar() {
+    const nome = document.getElementById("nome").value.trim();
+    const imagem = document.getElementById("imagem").value.trim();
+    const preco = document.getElementById("preco").value;
+    const descricao = document.getElementById("descricao").value.trim();
 
-    const nome = document.getElementById("nome").value;
-
-    if (nome === "") {
-        alert("Digite o nome do produto!");
+    if (!nome || !imagem || !preco || !descricao) {
+        alert("Preencha todos os campos!");
         return;
     }
 
-    const resposta = await fetch(
-        URL + "/rest/v1/produtos",
-        {
-            method: "POST",
+    if (!Number.isFinite(Number(preco)) || Number(preco) <= 0) {
+        alert("Digite um preço válido!");
+        return;
+    }
 
-            headers: {
-                "apikey": KEY,
-                "Authorization": "Bearer " + KEY,
-                "Content-Type": "application/json"
-            },
+    try {
+        const resposta = await fetch(
+            URL + "/rest/v1/produtos",
+            {
+                method: "POST",
+                headers: {
+                    "apikey": KEY,
+                    "Authorization": "Bearer " + KEY,
+                    "Content-Type": "application/json",
+                    "Prefer": "return=minimal"
+                },
+                body: JSON.stringify({
+                    nome: nome,
+                    imagem: imagem,
+                    preco: Number(preco),
+                    descricao: descricao
+                })
+            }
+        );
 
-            body: JSON.stringify({
-                nome: nome
-            })
+        if (!resposta.ok) {
+            const erro = await resposta.text();
+            console.error(erro);
+            document.getElementById("mensagem").innerText =
+                "Erro ao salvar. Confira as colunas e as permissões do Supabase.";
+            return;
         }
-    );
-
-    if (resposta.ok) {
 
         document.getElementById("mensagem").innerText =
-            "Produto salvo!";
+            "Produto salvo com sucesso!";
 
         document.getElementById("nome").value = "";
+        document.getElementById("imagem").value = "";
+        document.getElementById("preco").value = "";
+        document.getElementById("descricao").value = "";
 
-        listarProdutos();
+        await listarProdutos();
 
-    } else {
-
+    } catch (erro) {
+        console.error(erro);
         document.getElementById("mensagem").innerText =
-            "Erro ao salvar.";
-
+            "Erro de conexão com o banco de dados.";
     }
 }
 
 
 // LISTAR PRODUTOS
 async function listarProdutos() {
-
-    const resposta = await fetch(
-        URL + "/rest/v1/produtos?select=*",
-        {
-            method: "GET",
-
-            headers: {
-                "apikey": KEY,
-                "Authorization": "Bearer " + KEY
-            }
-        }
-    );
-
-    const produtos = await resposta.json();
-
     const lista = document.getElementById("lista");
 
-    lista.innerHTML = "";
+    try {
+        const resposta = await fetch(
+            URL + "/rest/v1/produtos?select=*&order=id.desc",
+            {
+                method: "GET",
+                headers: {
+                    "apikey": KEY,
+                    "Authorization": "Bearer " + KEY
+                }
+            }
+        );
 
-    produtos.forEach(produto => {
+        if (!resposta.ok) {
+            throw new Error(await resposta.text());
+        }
 
-        const item = document.createElement("li");
+        const produtos = await resposta.json();
 
-        item.innerText =
-            produto.id + " - " + produto.nome;
+        lista.innerHTML = "";
 
-        lista.appendChild(item);
+        produtos.forEach(produto => {
+            const item = document.createElement("li");
 
-    });
-}
+            item.style.listStyle = "none";
+            item.style.border = "1px solid #ddd";
+            item.style.borderRadius = "10px";
+            item.style.padding = "15px";
+            item.style.marginBottom = "15px";
+            item.style.maxWidth = "350px";
 
+            const titulo = document.createElement("h3");
+            titulo.textContent = produto.nome;
 
-// CARREGAR PRODUTOS AO ABRIR A PÁGINA
-listarProdutos();
+            const foto = document.createElement("img");
+            foto.src = produto.imagem;
+            foto.alt = produto.nome;
+            foto.style.width = "100%";
+            foto.style.maxWidth = "300px";
+            foto.style.height = "220px";
+            foto.style.objectFit = "cover";
+            foto.style.borderRadius = "8px";
+
+            foto.onerror = function () {
+                this.alt = "Não foi possível carregar a imagem";
+                this.style.display = "none";
+            };
+
+            const textoDescricao
