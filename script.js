@@ -2,16 +2,34 @@
 const URL = "https://hqtqbprrvaymchhaucfx.supabase.co";
 const KEY = "sb_publishable_CGVN66a-EdSQH6AQ_saMTg_VsDBBTJn";
 
+// ELEMENTOS DA PÁGINA
+const campo = (id) => document.getElementById(id);
+
+// VALIDAR ENDEREÇO DA IMAGEM
+function imagemValida(endereco) {
+    try {
+        const url = new URL(endereco);
+        return url.protocol === "https:" || url.protocol === "http:";
+    } catch {
+        return false;
+    }
+}
+
 // SALVAR PRODUTO
 async function salvar() {
-    const nome = document.getElementById("nome").value.trim();
-    const imagem = document.getElementById("imagem").value.trim();
-    const precoTexto = document.getElementById("preco").value.trim();
-    const descricao = document.getElementById("descricao").value.trim();
-    const mensagem = document.getElementById("mensagem");
+    const nome = campo("nome").value.trim();
+    const imagem = campo("imagem").value.trim();
+    const precoTexto = campo("preco").value.trim();
+    const descricao = campo("descricao").value.trim();
+    const mensagem = campo("mensagem");
 
     if (!nome || !imagem || !precoTexto || !descricao) {
         mensagem.textContent = "Preencha todos os campos!";
+        return;
+    }
+
+    if (!imagemValida(imagem)) {
+        mensagem.textContent = "Digite um link válido para a imagem!";
         return;
     }
 
@@ -28,10 +46,10 @@ async function salvar() {
         const resposta = await fetch(`${URL}/rest/v1/produtos`, {
             method: "POST",
             headers: {
-                "apikey": KEY,
-                "Authorization": `Bearer ${KEY}`,
+                apikey: KEY,
+                Authorization: `Bearer ${KEY}`,
                 "Content-Type": "application/json",
-                "Prefer": "return=minimal"
+                Prefer: "return=minimal"
             },
             body: JSON.stringify({
                 nome,
@@ -44,16 +62,16 @@ async function salvar() {
         if (!resposta.ok) {
             const erro = await resposta.text();
             console.error("Erro Supabase:", erro);
-            mensagem.textContent = "Erro ao salvar: " + erro;
+            mensagem.textContent = "Erro ao salvar produto: " + erro;
             return;
         }
 
         mensagem.textContent = "Produto salvo com sucesso!";
 
-        document.getElementById("nome").value = "";
-        document.getElementById("imagem").value = "";
-        document.getElementById("preco").value = "";
-        document.getElementById("descricao").value = "";
+        campo("nome").value = "";
+        campo("imagem").value = "";
+        campo("preco").value = "";
+        campo("descricao").value = "";
 
         await listarProdutos();
 
@@ -66,18 +84,23 @@ async function salvar() {
 
 // LISTAR PRODUTOS
 async function listarProdutos() {
-    const lista = document.getElementById("lista");
+    const lista = campo("lista");
+
+    if (!lista) {
+        console.error("Elemento lista não encontrado!");
+        return;
+    }
 
     try {
-        lista.innerHTML = "<li>Carregando produtos...</li>";
+        lista.innerHTML = "Carregando produtos...";
 
         const resposta = await fetch(
             `${URL}/rest/v1/produtos?select=*&order=id.desc`,
             {
                 method: "GET",
                 headers: {
-                    "apikey": KEY,
-                    "Authorization": `Bearer ${KEY}`
+                    apikey: KEY,
+                    Authorization: `Bearer ${KEY}`
                 }
             }
         );
@@ -105,14 +128,19 @@ async function listarProdutos() {
                 padding: 15px;
                 margin-bottom: 15px;
                 max-width: 350px;
+                background: white;
             `;
 
+            // NOME
             const titulo = document.createElement("h3");
-            titulo.textContent = produto.nome;
+            titulo.textContent = produto.nome || "Produto sem nome";
 
+            // IMAGEM
             const foto = document.createElement("img");
-            foto.src = produto.imagem;
-            foto.alt = produto.nome;
+            const endereco = produto.imagem;
+
+            foto.alt = produto.nome || "Imagem do produto";
+
             foto.style.cssText = `
                 width: 100%;
                 max-width: 300px;
@@ -121,15 +149,25 @@ async function listarProdutos() {
                 border-radius: 8px;
             `;
 
-            foto.onerror = () => {
-                foto.alt = "Imagem não encontrada";
+            if (endereco && imagemValida(endereco)) {
+                foto.src = endereco;
+
+                foto.onerror = function () {
+                    this.alt = "Não foi possível carregar a imagem";
+                    this.style.display = "none";
+                };
+            } else {
                 foto.style.display = "none";
-            };
+            }
 
+            // DESCRIÇÃO
             const textoDescricao = document.createElement("p");
-            textoDescricao.textContent = produto.descricao;
+            textoDescricao.textContent =
+                produto.descricao || "Sem descrição";
 
+            // PREÇO
             const textoPreco = document.createElement("strong");
+
             textoPreco.textContent = Number(produto.preco).toLocaleString(
                 "pt-BR",
                 {
@@ -138,6 +176,7 @@ async function listarProdutos() {
                 }
             );
 
+            // ADICIONAR ELEMENTOS
             item.appendChild(titulo);
             item.appendChild(foto);
             item.appendChild(textoDescricao);
@@ -147,13 +186,13 @@ async function listarProdutos() {
         });
 
     } catch (erro) {
-        console.error("Erro ao listar:", erro);
+        console.error("Erro ao listar produtos:", erro);
         lista.textContent = "Erro ao carregar produtos: " + erro.message;
     }
 }
 
 
-// CARREGAR PRODUTOS AO ABRIR A PÁGINA
+// CARREGAR AUTOMATICAMENTE
 document.addEventListener("DOMContentLoaded", () => {
     listarProdutos();
 });
