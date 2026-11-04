@@ -1,4 +1,4 @@
-```javascript
+
 const URL = "https://hqtqbprrvaymchhaucfx.supabase.co";
 const KEY = "sb_publishable_CGVN66a-EdSQH6AQ_saMTg_VsDBBTJn";
 
@@ -6,49 +6,49 @@ const KEY = "sb_publishable_CGVN66a-EdSQH6AQ_saMTg_VsDBBTJn";
 async function salvar() {
     const nome = document.getElementById("nome").value.trim();
     const imagem = document.getElementById("imagem").value.trim();
-    const preco = document.getElementById("preco").value;
+    const precoTexto = document.getElementById("preco").value.trim();
     const descricao = document.getElementById("descricao").value.trim();
+    const mensagem = document.getElementById("mensagem");
 
-    if (!nome || !imagem || !preco || !descricao) {
-        alert("Preencha todos os campos!");
+    if (!nome || !imagem || !precoTexto || !descricao) {
+        mensagem.textContent = "Preencha todos os campos!";
         return;
     }
 
-    if (!Number.isFinite(Number(preco)) || Number(preco) <= 0) {
-        alert("Digite um preço válido!");
+    const preco = Number(precoTexto.replace(",", "."));
+
+    if (!Number.isFinite(preco) || preco <= 0) {
+        mensagem.textContent = "Digite um preço válido!";
         return;
     }
 
     try {
-        const resposta = await fetch(
-            URL + "/rest/v1/produtos",
-            {
-                method: "POST",
-                headers: {
-                    "apikey": KEY,
-                    "Authorization": "Bearer " + KEY,
-                    "Content-Type": "application/json",
-                    "Prefer": "return=minimal"
-                },
-                body: JSON.stringify({
-                    nome: nome,
-                    imagem: imagem,
-                    preco: Number(preco),
-                    descricao: descricao
-                })
-            }
-        );
+        mensagem.textContent = "Salvando produto...";
+
+        const resposta = await fetch(`${URL}/rest/v1/produtos`, {
+            method: "POST",
+            headers: {
+                "apikey": KEY,
+                "Authorization": `Bearer ${KEY}`,
+                "Content-Type": "application/json",
+                "Prefer": "return=minimal"
+            },
+            body: JSON.stringify({
+                nome,
+                imagem,
+                preco,
+                descricao
+            })
+        });
 
         if (!resposta.ok) {
             const erro = await resposta.text();
-            console.error(erro);
-            document.getElementById("mensagem").innerText =
-                "Erro ao salvar. Confira as colunas e as permissões do Supabase.";
+            console.error("Erro Supabase:", erro);
+            mensagem.textContent = "Erro ao salvar: " + erro;
             return;
         }
 
-        document.getElementById("mensagem").innerText =
-            "Produto salvo com sucesso!";
+        mensagem.textContent = "Produto salvo com sucesso!";
 
         document.getElementById("nome").value = "";
         document.getElementById("imagem").value = "";
@@ -59,8 +59,7 @@ async function salvar() {
 
     } catch (erro) {
         console.error(erro);
-        document.getElementById("mensagem").innerText =
-            "Erro de conexão com o banco de dados.";
+        mensagem.textContent = "Erro de conexão com o Supabase.";
     }
 }
 
@@ -70,13 +69,15 @@ async function listarProdutos() {
     const lista = document.getElementById("lista");
 
     try {
+        lista.innerHTML = "<li>Carregando produtos...</li>";
+
         const resposta = await fetch(
-            URL + "/rest/v1/produtos?select=*&order=id.desc",
+            `${URL}/rest/v1/produtos?select=*&order=id.desc`,
             {
                 method: "GET",
                 headers: {
                     "apikey": KEY,
-                    "Authorization": "Bearer " + KEY
+                    "Authorization": `Bearer ${KEY}`
                 }
             }
         );
@@ -89,15 +90,22 @@ async function listarProdutos() {
 
         lista.innerHTML = "";
 
+        if (produtos.length === 0) {
+            lista.textContent = "Nenhum produto cadastrado.";
+            return;
+        }
+
         produtos.forEach(produto => {
             const item = document.createElement("li");
 
-            item.style.listStyle = "none";
-            item.style.border = "1px solid #ddd";
-            item.style.borderRadius = "10px";
-            item.style.padding = "15px";
-            item.style.marginBottom = "15px";
-            item.style.maxWidth = "350px";
+            item.style.cssText = `
+                list-style: none;
+                border: 1px solid #ddd;
+                border-radius: 10px;
+                padding: 15px;
+                margin-bottom: 15px;
+                max-width: 350px;
+            `;
 
             const titulo = document.createElement("h3");
             titulo.textContent = produto.nome;
@@ -105,15 +113,47 @@ async function listarProdutos() {
             const foto = document.createElement("img");
             foto.src = produto.imagem;
             foto.alt = produto.nome;
-            foto.style.width = "100%";
-            foto.style.maxWidth = "300px";
-            foto.style.height = "220px";
-            foto.style.objectFit = "cover";
-            foto.style.borderRadius = "8px";
+            foto.style.cssText = `
+                width: 100%;
+                max-width: 300px;
+                height: 220px;
+                object-fit: cover;
+                border-radius: 8px;
+            `;
 
-            foto.onerror = function () {
-                this.alt = "Não foi possível carregar a imagem";
-                this.style.display = "none";
+            foto.onerror = () => {
+                foto.alt = "Imagem não encontrada";
+                foto.style.display = "none";
             };
 
-            const textoDescricao
+            const textoDescricao = document.createElement("p");
+            textoDescricao.textContent = produto.descricao;
+
+            const textoPreco = document.createElement("strong");
+            textoPreco.textContent = Number(produto.preco).toLocaleString(
+                "pt-BR",
+                {
+                    style: "currency",
+                    currency: "BRL"
+                }
+            );
+
+            item.appendChild(titulo);
+            item.appendChild(foto);
+            item.appendChild(textoDescricao);
+            item.appendChild(textoPreco);
+
+            lista.appendChild(item);
+        });
+
+    } catch (erro) {
+        console.error("Erro ao listar:", erro);
+        lista.textContent = "Erro ao carregar produtos: " + erro.message;
+    }
+}
+
+
+// CARREGAR PRODUTOS AO ABRIR A PÁGINA
+document.addEventListener("DOMContentLoaded", () => {
+    listarProdutos();
+});
